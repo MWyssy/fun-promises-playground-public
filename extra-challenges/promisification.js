@@ -8,7 +8,12 @@ function readSecretFile(cb) {
 }
 
 function promisifiedReadSecretFile() {
-  // your code here
+  return new Promise((resolve, reject) => {
+    readSecretFile((err, data) => {
+      if (err) return reject(new Error('Could not find the file!'))
+      else return resolve(data)
+    })
+  })
 }
 
 module.exports = { readSecretFile, promisifiedReadSecretFile };
