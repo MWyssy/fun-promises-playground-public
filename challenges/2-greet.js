@@ -1,4 +1,3 @@
-const fsPromise = require('fs/promises');
 const inquirer = require('inquirer');
 
 const question = {
