@@ -1,6 +1,7 @@
 const fsPromise = require('fs/promises');
 const inquirer = require('inquirer');
 const axios = require('axios');
+const Spinner = require('cli-spinner').Spinner;
 
 const filmChoice = {
         type: 'list',
@@ -21,7 +22,7 @@ const infoType = {
         name: 'type',
         message: 'What would you like more information about?',
         choices: [
-            'People',
+            'Characters',
             'Planets',
             'Starships',
             'Vehicles',
@@ -31,51 +32,89 @@ const infoType = {
 
 const specificInfo = {
         type: 'list',
-        name: 'type',
+        name: 'specificItem',
         message: 'What would you like more information about?',
         choices: []
     }
 
+const goAgain = {
+    type: 'list',
+    name: 'wouldLike',
+    message: 'Would you like information about anythign else?',
+    choices: ['Yes', 'No']
+}
+
 function runApp() {
     inquirer
         .prompt(filmChoice)
-        .then((answer) => {
-            const filmUrl = answer.filmName.match(/[1-6]/)[0]
+        .then((answerOne) => {
+            const spinner = new Spinner('finding film info...');
+            spinner.setSpinnerString('|/-\\');
+            spinner.start();
+            const filmUrl = answerOne.filmName.match(/[1-6]/)[0];
+            const urlStore = {};
             axios.get(`https://swapi.dev/api/films/${filmUrl}`)
-                .then((data) => {
+                .then((filmData) => {
                     console.log(
-                        '\nDirector: ', data.data.director,
-                        '\nProducers: ', data.data.producer,
-                        '\nRelease Date: ', data.data.release_date,
-                        '\n\nOpening Crawl: \n\n', data.data.opening_crawl,
+                        '\nDirector: ', filmData.data.director,
+                        '\nProducers: ', filmData.data.producer,
+                        '\nRelease Date: ', filmData.data.release_date,
+                        '\n\nOpening Crawl: \n\n', filmData.data.opening_crawl,
                         )
-                })
-                .catch((err) => {
-                    throw new err;
-                })
-            setTimeout(() => {
-                inquirer
-                    .prompt(infoType)
-                    .then((answer) => {
-                        const typeUrl = answer.type.toLowerCase();
-                        axios.get(`https://swapi.dev/api/${typeUrl}`)
-                            .then((data) => {
-                                data.data.results.forEach((option) => specificInfo.choices.push(option.name))
+                        spinner.stop()
+                    })
+                    .catch((err) => {
+                        throw new err;
+                    })
+                    setTimeout(() => {
+                        inquirer
+                        .prompt(infoType)
+                        .then((answerTwo) => {
+                        const spinner = new Spinner(`'finding the ${answerTwo.type}...`);
+                        spinner.setSpinnerString('|/-\\');
+                        spinner.start();
+                        const subcat = answerTwo.type.toLowerCase()
+                        axios.get(`https://swapi.dev/api/films/${filmUrl}`)
+                            .then((filmData) => {
+                                let subcatSearch = subcat;
+                                if (subcatSearch === 'characters') subcatSearch = 'people';
+                                filmData.data[subcat].forEach((option) => {
+                                    const optionNum = option.match(/[0-9]+/)[0];
+                                    axios.get(`https://swapi.dev/api/${subcatSearch}/${optionNum}`)
+                                    .then((subcatData) => {
+                                        specificInfo.choices.push(subcatData.data.name);
+                                        urlStore[subcatData.data.name] = `https://swapi.dev/api/${subcatSearch}/${optionNum}`;
+                                    })
+                                })
+                                spinner.stop()
                             })
                             .catch((err) => {
                                 throw new err;
                             })
-                        setTimeout(() => {
-                            inquirer
+                            setTimeout(() => {
+                                inquirer
                                 .prompt(specificInfo)
-                                .then((answer) => {
-                                    axios.get(`https://swapi.dev/api/${typeUrl}/${answer}`)
-
-                                })    
-                        }, 2000)    
-                    })
-            }, 5000)
-        })
+                                .then((answerThree) => {
+                                    const specificInfoUrl = urlStore[answerThree.specificItem]
+                                    axios.get(specificInfoUrl)
+                                    .then((soecificItemData) => {
+                                        console.log(soecificItemData.data)
+                                    })
+                                    .catch((err) => {
+                                        throw new err
+                                    });
+                                    setTimeout(() => {
+                                        inquirer
+                                        .prompt(goAgain)
+                                        .then((answer) => {
+                                            if (answer.wouldLike === 'Yes') runApp();
+                                        });
+                                    }, 2000)
+                                });
+                        }, 2000); 
+                    });
+            }, 5000);
+        });
 };
 
 runApp();
